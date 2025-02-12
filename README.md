@@ -39,18 +39,22 @@ Creating virtualenv at: .venv
 Activate with: source .venv/bin/activate.fish
 ```
 
-¡Y no olvides activarlo!
-
-```
-$ source .venv/bin/activate
-(.venv) $ 
-```
+> [!TIP]
+> Tradicionalmente había que activar el entorno virtual, pero ¡con uv no hace falta!
+> Aun así, si quieres hacerlo, en Linux y macOS se hace de esta forma:
+> ```
+> $ source .venv/bin/activate
+> (.venv) $ 
+> ```
+>
+> Si estás en Windows, mejor usar Windows Subsystem for Linux (WSL), Git Bash,
+> o alguna otra terminal que emule un entorno Linux.
 
 A partir de aquí ya puedes instalar las dependencias que necesites.
 Por ejemplo, para instalar [IPython](https://ipython.readthedocs.io/):
 
 ```
-(.venv) $ uv pip install ipython
+$ uv pip install ipython
 Resolved 16 packages in 243ms
 Installed 16 packages in 241ms
  + asttokens==2.4.1
@@ -71,166 +75,112 @@ Installed 16 packages in 241ms
  + wcwidth==0.2.13
 ```
 
-## 2. Creación de paquetes con `flit`
+## 2. Metadatos del proyecto
 
 Un paquete Python está definidi por un archivo `pyproject.toml` con ciertos metadatos
 y una estructura de directorios concreta.
 
 Puedes crear el archivo `pyproject.toml` y los directorios a mano,
 o puedes utilizar alguna de las múltiples herramientas que existen para ello.
-Algunas muy conocidas son Pipenv, flit, Poetry, PDM, Hatch, rye...
-Sin embargo, algunas como Pipenv y Poetry no son compatibles con [los últimos estándares de Python]((https://peps.python.org/pep-0621/).
 
-La más sencilla de todas es [`flit`](https://github.com/pypa/flit/).
-`flit` es una herramienta para crear y publicar paquetes Python.
-
-Para empezar, con tu entorno virtual activado, instala `flit` con `uv`:
+La más sencilla de todas es, de nuevo, `uv`:
 
 ```
-(.venv) $ uv pip install flit
-...
+$ uv init --bare
+Initialized project `nuevo-proyecto`
 ```
-
-Y a continuación:
-
-```
-(.venv) $ flit init
-Module name: nuevo_proyecto
-Author: (tu nombre)
-Author email: (tu email)
-Home page: 
-Choose a license (see http://choosealicense.com/ for more info)
-1. MIT - simple and permissive
-2. Apache - explicitly grants patent rights
-3. GPL - ensures that code based on this is shared with the same terms
-4. Skip - choose a license later
-Enter 1-4 [4]: 4
-
-Written pyproject.toml; edit that file to add optional extra info.
-```
-
-Solo necesitas nombre del módulo (debe ser un nombre válido en Python, por tanto nada de espacios ni guiones),
-tu nombre, tu email, y nada más.
 
 Ya tienes tu archivo `pyproject.toml` creado:
 
 ```
-(.venv) $ tree
+$ tree
 .
 └── pyproject.toml
 
 1 directory, 1 file
-(.venv) $ cat pyproject.toml
-[build-system]
-requires = ["flit_core >=3.2,<4"]
-build-backend = "flit_core.buildapi"
-
+$ cat pyproject.toml
 [project]
-name = "nuevo_proyecto"
-authors = [{name = "Juan Luis Cano Rodríguez", email = "hello@juanlu.space"}]
-dynamic = ["version", "description"]
+name = "nuevo-proyecto"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = []
 ```
 
-### Primer archivo de código
+### Gestión de dependencias
 
-Todavía quedan cosas por hacer, eso sí.
-Para comprobarlo, trata de instalar tu propio paquete con `uv` en modo editable:
+`uv` también te ayuda a agregar dependencias a tu proyecto.
 
-```
-(.venv) $ uv pip install --editable .
-error: Failed to download and build: `nuevo-proyecto @ file:///private/tmp/nuevo-proyecto`
-  Caused by: Failed to build: `nuevo-proyecto @ file:///private/tmp/nuevo-proyecto`
-  Caused by: Build backend failed to determine extra requires with `build_editable()` with exit status: 1
---- stdout:
-
---- stderr:
-Traceback (most recent call last):
-  File "<string>", line 14, in <module>
-  File "/Users/juan_cano/Library/Caches/uv/environments-v0/.tmpnvIDGY/lib/python3.12/site-packages/flit_core/buildapi.py", line 31, in get_requires_for_build_wheel
-    module = Module(info.module, Path.cwd())
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/juan_cano/Library/Caches/uv/environments-v0/.tmpnvIDGY/lib/python3.12/site-packages/flit_core/common.py", line 59, in __init__
-    raise ValueError("No file/folder found for module {}".format(name))
-ValueError: No file/folder found for module nuevo_proyecto
----
-```
-
-Claro, ¡tu paquete aún no tiene archivos!
-En primer lugar, crea un directorio con el nombre de tu módulo dentro de otro directorio `src`:
+Por ejemplo, si quieres utilizar la biblioteca Pydantic:
 
 ```
-(.venv) $ mkdir -p src/nuevo_proyecto/
+$ uv add pydantic
+ Resolved 5 packages in 7.28s
+Prepared 1 package in 1.71s
+Installed 4 packages in 33ms
+ + annotated-types==0.7.0
+ + pydantic==2.10.6
+ + pydantic-core==2.27.2
+ + typing-extensions==4.12.2
+```
+
+Esto tiene varios efectos:
+- Se añade `pydantic>=2.10.6` a la lista de dependencias en `pyproject.toml`
+- Se instala en el entorno virtual, así como sus dependencias transitivas
+- Se crea un archivo `uv.lock`, que contiene la información "congelada" del entorno para que sea fácilmente reproducible.
+
+Puedes comprobar que funciona borrando el entorno virtual y dejando que uv lo cree desde cero:
+
+```
+$ rm -rf .venv  # Oh no!
+$ uv sync  # uv al rescate
+Using CPython 3.13.0
+Creating virtual environment at: .venv
+Resolved 5 packages in 0.54ms
+Installed 4 packages in 11ms
+ + annotated-types==0.7.0
+ + pydantic==2.10.6
+ + pydantic-core==2.27.2
+ + typing-extensions==4.12.2
+```
+
+### 3. Código reutilizable
+
+Ahora podríamos crear archivos `.py`, pero vamos a darle una vuelta de tuerca más al proyecto
+y utilizar la estructura de directorios estándar para que nuestro código sea reutilizable. 
+
+Primero crea un directorio con el nombre de tu paquete dentro de otro directorio `src`:
+
+```
+$ mkdir -p src/nuevo_proyecto/
 ```
 
 A continuación, crea un archivo `__init__.py` en dicho directorio:
 
 ```
-(.venv) $ touch src/nuevo_proyecto/__init__.py
+$ echo 'print("Hello, world!")' > src/nuevo_proyecto/__init__.py
 ```
 
-¿Ya hemos terminado? Todavía no:
+Por último, tenemos que modificar nuestro `pyproject.toml` para que nuestro paquete sea instalable:
 
 ```
-(.venv) $ uv pip install -e .
-error: Failed to download and build: `nuevo-proyecto @ file:///private/tmp/nuevo-proyecto`
-  Caused by: Failed to build: `nuevo-proyecto @ file:///private/tmp/nuevo-proyecto`
-  Caused by: Build backend failed to determine metadata through `prepare_metadata_for_build_editable` with exit status: 1
---- stdout:
+$ head -n6 pyproject.toml
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
---- stderr:
-Traceback (most recent call last):
-  File "<string>", line 14, in <module>
-  File "/Users/juan_cano/Library/Caches/uv/environments-v0/.tmpnJNK4S/lib/python3.12/site-packages/flit_core/buildapi.py", line 49, in prepare_metadata_for_build_wheel
-    metadata = make_metadata(module, ini_info)
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/juan_cano/Library/Caches/uv/environments-v0/.tmpnJNK4S/lib/python3.12/site-packages/flit_core/common.py", line 425, in make_metadata
-    md_dict.update(get_info_from_module(module, ini_info.dynamic_metadata))
-                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/juan_cano/Library/Caches/uv/environments-v0/.tmpnJNK4S/lib/python3.12/site-packages/flit_core/common.py", line 228, in get_info_from_module
-    raise NoDocstringError(
-flit_core.common.NoDocstringError: Flit cannot package module without docstring, or empty docstring. Please add a docstring to your module (/private/tmp/nuevo-proyecto/src/nuevo_proyecto/__init__.py).
----
+[project]
+name = "nuevo-proyecto"
 ```
 
-Falta la [cadena de documentación](https://docs.python.org/es/3.12/glossary.html#term-docstring) ("docstring" en inglés).
-Modifica tu archivo `__init__.py` para que tenga este aspecto:
+Y ahora sí, corremos nuestro intérprete con uv:
 
 ```
-(.venv) $ cat src/nuevo_proyecto/__init__.py
-"""
-Nuevo proyecto.
-"""
-
-__version__ = "0.1.dev0"
-
+$ uv run python -c "import nuevo_proyecto"
+Installed 1 package in 24ms
+Hello, world!
 ```
 
-> [!NOTE]  
-> La versión `__version__ = "0.1.dev0"` es obligatoria también
-
-Y ahora sí:
-
-```
-(.venv) $ uv pip install -e .
-Resolved 1 package in 298ms
-   Built nuevo-proyecto @ file:///private/tmp/nuevo-proyecto
-Prepared 1 package in 215ms
-Installed 1 package in 4ms
- + nuevo-proyecto==0.1.dev0 (from file:///private/tmp/nuevo-proyecto)
-```
-
-Comprueba que está todo bien:
-
-```
-(.venv) $ python
-Python 3.12.3 (main, Apr  9 2024, 08:09:14) [Clang 15.0.0 (clang-1500.3.9.4)] on darwin
-Type "help", "copyright", "credits" or "license" for more information.
->>> import nuevo_proyecto
->>> nuevo_proyecto.__version__
-'0.1.dev0'
-```
-
-¡Listo! 🎉
+¡Y ya está! Ahora tu proyecto se importa como cualquier otro paquete Python 🎉
 
 > [!TIP]
 > ¡Buen momento para guardar tus cambios con `git`!
